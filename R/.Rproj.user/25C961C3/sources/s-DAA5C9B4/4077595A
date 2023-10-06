@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1555399510296.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "4077595A",
+    "lastKnownWriteTime" : 1555398662,
+    "last_content_update" : 1555398662,
+    "path" : "~/repos/ma/R_MA_Reinicke/03_function_compare.R",
+    "project_path" : "03_function_compare.R",
+    "properties" : {
+        "cursorPosition" : "0,27",
+        "scrollLine" : "0"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

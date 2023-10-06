@@ -1,0 +1,26 @@
+#' @author {Selina Reinicke}
+
+## Packages (alphabetically) ##
+# install.packages("forecast")
+# install.packages("ftsa")
+# install.packages("ggplot2")
+# install.packages("vars")
+# install.packages("xts")
+# install.packages("YieldCurve")
+
+
+## Libraries ##
+library(xts)
+
+# Input-Data and NelsonSiegel #
+library(YieldCurve)
+library(forecast)
+
+# Functional approaches #
+library(ftsa)
+library(rainbow)
+
+# Plots #
+library(ggplot2)
+
+

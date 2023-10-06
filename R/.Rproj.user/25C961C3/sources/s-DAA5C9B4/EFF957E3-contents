@@ -1,0 +1,11 @@
+# Diebod Li lambda #
+lambda_try <- 0.05976667
+DLx <- function(x) { ( (1-exp(-lambda_try*x)) / (lambda_try*x)) - exp(-lambda_try*x)}
+plot(DLx(0:120), type="o")
+abline(v=30)
+
+DLX <- function(x) { ( (1-exp(-x)) / (x)) - exp(-x)}
+optimize(f = DLX, interval = c(0, 120), maximum = TRUE )
+
+1.79329/30                                   # Resulting lambda when maximizing at 30 months.
+1.79329/29.44                               # Molenaars et al.

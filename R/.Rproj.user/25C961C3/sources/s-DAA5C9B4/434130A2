@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1555398626171.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "434130A2",
+    "lastKnownWriteTime" : 1555346489,
+    "last_content_update" : 1555346489,
+    "path" : "~/repos/ma/R_MA_Reinicke/06_plots_analyses.R",
+    "project_path" : "06_plots_analyses.R",
+    "properties" : {
+        "cursorPosition" : "346,52",
+        "scrollLine" : "334"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

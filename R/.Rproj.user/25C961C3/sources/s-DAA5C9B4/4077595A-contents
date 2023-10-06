@@ -1,0 +1,169 @@
+#' @author {Selina Reinicke}
+
+# Clear workspace #
+#rm(list=ls())
+
+# Set working directory #
+# setwd("C:/Users/...R_MA_Reinicke")
+
+source("01_packages.R")
+source("02_input_data.R") 
+
+########################################
+# Function for evaluating FPCA models #
+
+wrap_PCA <- function(trainings_weeks, fts_object, start, h, order_k, pred_method) {
+  
+  if((start -1 + trainings_weeks + h) > ncol(fts_object$y)) stop("Too few curves in test data, reduce trainings_weeks or h")
+  
+  max_model <- ncol(fts_object$y) - trainings_weeks - h +1
+  
+  comp_apply <- function(x) {
+    
+    end <- x + trainings_weeks -1
+    fts_subset <- extract(fts_object, direction = "time", timeorder = x:end) # Subset data
+    
+    fpca_model <- ftsm(y = fts_subset, order = order_k, mean = TRUE, weight = FALSE)   # Generate FPCA model - weights can be generated here: "weight = TRUE".
+    
+    ftsm_predict <- forecast.ftsm(fpca_model, h = h, method = pred_method)   # Generate forecasts based on the different models
+    
+    predict_error <- error(forecast = ftsm_predict$mean$y, 
+                           true = fts_object$y[, (end+1):(end+h)], method = "rmse")    # Measuring prediction errors of interest rates in a curve combined.
+
+    # print(fpca_model$varprop[1] + fpca_model$varprop[2])
+
+    result <- c((end+1), (end+h), predict_error, fpca_model$varprop[1], fpca_model$varprop[2])
+  }
+  
+  table_forecasting <- as.matrix(vapply(start:max_model, comp_apply, c("First" = 0, "Last" = 0, "RMSE" = 0, "1_PCA_prop" = 0, "2_PCA_prop" = 0)))
+  
+  res_list <- list(Results_FPCA = t(table_forecasting[1:3,]), 
+                   "Mean_RMSE" = round(mean(table_forecasting["RMSE",]), 5),
+                   "Smallest var. by 1st PCA:", round(min(table_forecasting["1_PCA_prop",]), 3)
+  #                 , Infos = cbind(c("Forecast horizon:", "Number of models:","Training set:"), 
+  #                                c(h, max_model-start+1, trainings_weeks))
+                   )
+
+  # print(res_list$Results_FPCA)
+  # print("##########")
+  # print("Mean RMSE:")
+  # print(res_list$Mean_RMSE)
+  # print(paste("Smallest var. by 1st PCA:", round(min(table_forecasting["1_PCA_prop",]), 3)))
+  # print(paste("Largest var. by 2st PCA:", round(max(table_forecasting["2_PCA_prop",]), 3)))
+  
+  return(res_list)
+}
+
+# For rolling study #
+
+roll_PCA <- function(trainings_weeks, fts_object, start, h, order_k, pred_method) {
+  inner <- wrap_PCA(trainings_weeks=trainings_weeks, fts_object=fts_object, start=start, h=h, order_k=order_k, pred_method=pred_method)
+  print(paste("RMSE:", inner$Mean_RMSE))
+  return(list(inner$Mean_RMSE, inner))
+}
+
+  
+########################################
+# Function for evaluating Diebold-Li models #
+
+wrap_DL <- function(trainings_weeks, xts_object, start, h, order_p, mat_vec) {
+  
+  if((start -1 + trainings_weeks + h) > nrow(xts_object)) stop("Too few curves in test data, reduce trainings_weeks or h")
+  
+  max_model <- nrow(xts_object) - trainings_weeks - h +1
+
+  comp_apply <- function(x) {
+
+    end <- x + trainings_weeks -1
+    xtssubset <- xts_object[x:end]                    # Subset data
+    
+    print(paste("Estimating model:", x))
+    est_parameters <- Nelson.Siegel(xtssubset, mat_vec)          # DL_model estimates parameters, takes most time.
+    
+  # AR model and forecast parameters
+    arfit0 <- auto.arima(est_parameters$beta_0, max.p = order_p, max.q = 0, max.order = order_p, max.d = 0, max.D = 0,
+                         ic = c("aic"), seasonal = FALSE, stepwise = TRUE)
+    arfit1 <- auto.arima(est_parameters$beta_1, max.p = order_p, max.q = 0, max.order = order_p, max.d = 0, max.D = 0,
+                         ic = c("aic"), seasonal = FALSE, stepwise = TRUE)
+    arfit2 <- auto.arima(est_parameters$beta_2, max.p = order_p, max.q = 0, max.order = order_p, max.d = 0, max.D = 0,
+                         ic = c("aic"), seasonal = FALSE, stepwise = TRUE)
+    
+    for0 <- forecast(arfit0, h = h)
+    for1 <- forecast(arfit1, h = h)
+    for2 <- forecast(arfit2, h = h)
+    
+  # Calculate nelsonsiegel_rates with forecasted parameters
+    NSparameter <- est_parameters[1:h]
+    NSparameter$beta_0 <- round(as.vector(for0$mean), 6)
+    NSparameter$beta_1 <- round(as.vector(for1$mean), 6)
+    NSparameter$beta_2 <- round(as.vector(for2$mean), 6)
+    NSparameter$lambda <- mean(est_parameters$lambda)
+    
+    for_rates <- NSrates(NSparameter, mat_vec)
+    error_rates <- t(for_rates)
+    
+    # Calculate errors
+    predict_error <- error(forecast = error_rates,
+                            true = t(as.matrix(coredata(xts_object)[(end+1):(end+h),])), method = "rmse")        
+    
+    result <- c((end+1), (end+h), predict_error)
+  }
+
+  table_forecasting <- as.matrix(vapply(start:max_model, comp_apply, c("First" = 0, "Last" = 0, "RMSE" = 0)))
+
+  res_list <- list("Results_D-L" = t(table_forecasting),
+                   "Mean_RMSE" = round(mean(table_forecasting["RMSE",]), 5)
+#                  , Infos = cbind(c("Forecast horizon:", "Number of models:","Training set:"), 
+#                                 c(h, max_model-start+1, trainings_weeks))
+                   )
+                   
+  # print(res_list$"Results_D-L")
+  # print("##########")
+  # print("Mean RMSE:")
+  # print(res_list$Mean_RMSE)
+  
+  return(res_list)
+}
+
+# For rolling study #
+
+roll_DL <- function(trainings_weeks, xts_object, start, h, order_p, mat_vec) {
+  inner <- wrap_DL(trainings_weeks = trainings_weeks, xts_object = xts_object, start = start, h = h, order_p = order_p, mat_vec = mat_vec)
+  print(paste("RMSE:", inner$Mean_RMSE))
+  return(list(inner$Mean_RMSE, inner))
+}
+
+########################
+wrap_RW <- function(trainings_weeks, fts_object, start, h) {
+  
+  if((start -1 + trainings_weeks + h) > ncol(fts_object$y)) stop("Too few curves in test data, reduce trainings_weeks or h")
+  
+  max_model <- ncol(fts_object$y) - trainings_weeks - h +1
+  
+  comp_apply <- function(x) {
+    
+    end <- x + trainings_weeks -1
+
+    rw_predict <- rep(fts_object$y[, (end)], times = h)   # Generate forecasts based on the different models
+    
+    predict_error <- error(forecast = rw_predict, 
+                           true = fts_object$y[, (end+1):(end+h)], method = "rmse")    # Measuring prediction errors of interest rates in a curve combined.
+    
+    result <- c((end+1), (end+h), predict_error)
+  }
+  
+  table_forecasting <- as.matrix(vapply(start:max_model, comp_apply, c("First" = 0, "Last" = 0, "RMSE" = 0)))
+  
+  res_list <- list("Results_RW" = t(table_forecasting),
+                   "Mean_RMSE" = round(mean(table_forecasting["RMSE",]), 5))
+  
+  return(res_list)
+}
+
+# For rolling study #
+
+roll_RW <- function(trainings_weeks, fts_object, start, h) {
+  inner <- wrap_PCA(trainings_weeks=trainings_weeks, fts_object=fts_object, start=start, h=h)
+  print(paste("RMSE:", inner$Mean_RMSE))
+  return(list(inner$Mean_RMSE, inner))
+}

@@ -1,0 +1,115 @@
+########################################
+# Function for evaluating FPCA models #
+
+var_wrap_PCA <- function(trainings_weeks, fts_object, start, h, order_k, pred_method) {
+  
+  if((start -1 + trainings_weeks + h) > ncol(fts_object$y)) stop("Too few curves in test data, reduce trainings_weeks or h")
+  
+  max_model <- ncol(fts_object$y) - trainings_weeks - h +1
+  
+  var_apply <- function(x) {
+    
+    end <- x + trainings_weeks -1
+    fts_subset <- extract(fts_object, direction = "time", timeorder = x:end) # Subset data
+    
+    fpca_model <- ftsm(y = fts_subset, order = order_k, mean = TRUE, weight = FALSE)   # Generate FPCA model - weights können hier generiert werden "weight = TRUE".
+    
+    ftsm_predict <- forecast.ftsm(fpca_model, h = h, method = pred_method)   # Generate forecasts based on the different models
+    
+    predict_error <- error(forecast = ftsm_predict$mean$y, 
+                           true = fts_object$y[, (end+1):(end+h)], method = "rmse")    # Measuring prediction errors of interest rates in a curve combined.
+    
+    result <- matrix(ftsm_predict$mean$y)
+  }
+  
+  table_forecasting <- as.matrix(vapply(start:max_model, var_apply))
+  
+  return(table_forecasting)
+}
+
+tw_var <- 300
+var_BB_PCA <- var_wrap_PCA(trainings_weeks = tw_var, fts_object = BB_indx_fts, start = st, h = horizon, order_k = 3, pred_method = "arima")
+write.csv(var_BB_PCA, file="var_BB_PCA_4_f3.txt")
+
+########################
+# Break up forecast matrices #
+break_up_forc <- function(var_object, mat_vec, h=h) {
+  neat_forecasts <- matrix(0, nrow = length(mat_vec), ncol = h)
+  neat_tables <- list()
+  for (x in 1:ncol(var_object)) {
+    neat_forecasts <- matrix(var_object[,x], nrow = length(mat_vec), ncol = h)
+    colnames(neat_forecasts) <- seq(1:h)
+    rownames(neat_forecasts) <- mat_vec
+    neat_tables[[x]] <- neat_forecasts
+  }
+  return(neat_tables)
+}
+
+neat_tables <- break_up_forc(var_BB_PCA, mat_vec = mat.BB, h=4)
+
+
+########################
+
+# Observed yield curves #
+obs_nr <- seq(from = 299, to = 300)
+obs <- fts(x = mat.BB, y= yield_data[, obs_nr], xname = "Maturities", yname = "Yields")
+
+########################
+# Plot forecasted yield curves by FPCA #
+
+curve_fpca <- 1
+forc_FPCA_fts <- fts(x = mat.BB, y = data.frame(neat_tables[curve_fpca]), start = 1, xname = "Maturities", yname = "Forecasts")
+plot(forc_FPCA_fts, ylab = "Yield curves", colorchoice = "rainbow", plotlegend = FALSE)
+lines(obs, col="black") 
+
+########################
+obs_range_week <- c(1:length(neat_tables))
+system.time({for(i in obs_range_week) {
+  forc_FPCA_fts <- fts(x = mat.BB, y = data.frame(neat_tables[i]), start = 1, xname = "Maturities", yname = "Forecasts")
+  plot(forc_FPCA_fts, ylab = paste("#", index[i+tw_var], sep=": "), colorchoice = "rainbow", ylim = c(-1,2))
+  title(main = "Yield curve forecasts")
+  grid()
+  Sys.sleep(0.05)
+}
+})
+
+# True values #
+system.time({for(i in (obs_range_week+tw_var)) {
+  plot(x=mat.BB, y=BB_weekly[i,], type = "o", ylab=paste("#", index[i], sep=": "), ylim = c(-1,5))
+  #title(main = "Yield curve")
+  grid()
+  Sys.sleep(0.05)
+}
+})
+
+########################
+# Plot one forecast by GP #
+
+forc_GP_BB_4 <- read.csv("BB_GPpred_estimates_4_(300).csv", header = FALSE, sep = ",")
+forc_GP_BB_4[,1] <- NULL
+forc_GP_BB_4 <- t(forc_GP_BB_4)
+colnames(forc_GP_BB_4) <- seq(1:4)
+
+forc_GP_BB_26 <- read.csv("BB_GPpred_estimates_26_(300).csv", header = FALSE, sep = ",")
+forc_GP_BB_26[,1] <- NULL
+forc_GP_BB_26 <- t(forc_GP_BB_26)
+colnames(forc_GP_BB_26) <- seq(1:26)
+
+forc_GP_BB_4_fts <- fts(x = mat.BB, y = forc_GP_BB_4, start = 1, xname = "Maturities", yname = "Forecasts")
+plot(forc_GP_BB_4_fts, ylab = "Yield curves", colorchoice = "rainbow", plotlegend = FALSE)
+
+forc_GP_BB_26_fts <- fts(x = mat.BB, y = forc_GP_BB_26, start = 1, xname = "Maturities", yname = "Forecasts")
+plot(forc_GP_BB_26_fts, ylab = "Yield curves", colorchoice = "rainbow", plotlegend = FALSE, ylim =c(-0.5,1.5), main="GP model for h=26")
+lines(obs, col="black") 
+
+########################
+# Plot one forecast by FPCA #
+fts_subset <- extract(BB_indx_fts, direction = "time", timeorder = 1:tw_var) # Subset data
+
+fpca_model <- ftsm(y = fts_subset, order = 3, mean = TRUE, weight = FALSE)   # Generate FPCA model - SR: weights können hier generiert werden "weight = TRUE".
+
+ftsm_predict <- forecast.ftsm(fpca_model, h = 26, method = "arima") 
+
+plot(ftsm_predict$mean, ylab = "Yield curves", colorchoice = "rainbow", plotlegend = FALSE, ylim =c(-0.5,1.5), main="FPCA model for h=26")
+lines(obs, col="black") 
+
