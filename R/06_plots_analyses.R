@@ -1,5 +1,3 @@
-#########################################
-results_plots <- read.table("results_plots.csv", sep=";", header = FALSE)
 
 #########################################
 # DL model #
