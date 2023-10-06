@@ -4,7 +4,7 @@
 rm(list=ls())
 
 # Set working directory #
-setwd("/Users/cemalozturk/Documents/DATA+/Ph.D/Thesis/tikIV/MA-SelinaReinecke/R_MA_Reinicke")
+setwd("/Users/cemalozturk/Documents/DATA+/Ph.D/Thesis/tikIV/R")
 
 source("01_packages.R")
 
