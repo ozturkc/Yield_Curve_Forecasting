@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@author: Selina Reinicke
+@author: Cemal Ozturk
 """
 
 import os
